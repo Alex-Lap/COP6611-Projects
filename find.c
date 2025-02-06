@@ -73,7 +73,7 @@ void find(char *path, char *look, int type_flag, char type_val, int inum_flag, i
                 if(printi_flag){
                     printf(1, "%d", targetinfo.ino);
                 }
-                printf(1, "%s", path);
+                printf(1, "%s\n", path);
             }
         }
         if (strlen(path) + 1 + DIRSIZ + 1 > sizeof(buf) ){
