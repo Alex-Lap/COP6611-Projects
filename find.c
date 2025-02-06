@@ -28,7 +28,7 @@ char *fmtname(char *path){
 }
   
 
-void find(const char *path, const char *look, int type_flag, char type_val, int inum_flag, int printi_flag, int inum_val){
+void find(char *path, const char *look, int type_flag, char type_val, int inum_flag, int printi_flag, int inum_val){
     struct stat targetinfo;
     struct dirent de;
     char buf[512], *p;
@@ -51,7 +51,7 @@ void find(const char *path, const char *look, int type_flag, char type_val, int 
     {
     case T_DEVICE:
     case T_FILE:
-        if(type_flag && type_val== 'f' || inum_flag && targetinfo.ino==inum_val){
+        if((type_flag && type_val== 'f') || (inum_flag && targetinfo.ino==inum_val)){
             char * name = fmtname(path);
             if(strcmp(look, name) == 0){
                 if(printi_flag){
@@ -105,13 +105,13 @@ int main(int argc, char *argv[]){
     //check input count to make sure it's valid. 
     // Expected Format: find [path] ["-name"] [file]
     if (argc<3){
-        //fprintf(2,"error");
-        return 1;
+        printf(2,"error\n");
+        exit();
     }
 
     
     int i = 2; 
-    const char* path = argv[1]; //path provided
+    char* path = argv[1]; //path provided
     const char* look = 0; // what we are looking for(file/dir)
     // flags if flag provided with input
     int type_flag = 0;
@@ -124,8 +124,8 @@ int main(int argc, char *argv[]){
         if (strcmp(argv[i], "-name") == 0){
             // valid input check
             if (i+1>=argc){
-                //fprintf(2,"error");
-                return 1;
+                printf(2,"error\n");
+                exit();
             }
             look = argv[i+1]; // lookup gotten
             i += 2;
@@ -133,23 +133,23 @@ int main(int argc, char *argv[]){
         else if (strcmp(argv[i], "-type") == 0){
             // valid input check
             if (i+1>=argc){
-                //fprintf(2,"error");
-                return 1;
+                printf(2,"error\n");
+                exit();
             }
             type_flag = 1; 
             type_val = argv[i+1][0]; //obtain parameter
             // parameter validity
             if (type_val != 'd' && type_val != 'f'){
-                //fprintf(2,"error");
-                return 1;
+                printf(2,"error\n");
+                exit();
             }
             i += 2;
         }
         else if (strcmp(argv[i], "-inum") == 0){
             // valid input check
             if (i+1>=argc){
-               // fprintf(2,"error");
-                return 1;
+                printf(2,"error\n");
+                exit();
             }
             inum_flag = 1; 
             inum_val = atoi(argv[i+1]);
@@ -158,26 +158,24 @@ int main(int argc, char *argv[]){
         else if (strcmp(argv[i], "-printi") == 0){
             // valid input check
             if (i+1>=argc){
-                //fprintf(2,"error");
-                return 1;
+                printf(2,"error\n");
+                exit();
             }
             printi_flag = 1; 
             i += 1;
         }
         else{
-           // fprintf(2,"error");
-            return 1;
+                printf(2,"error\n");
+                exit();
         }
     }
 
         if (look==0){
-            //fprintf(2,"error");
-            return 1;
+            printf(2,"error\n");
+            exit();
         }
 
         find(path, look, type_flag, type_val, inum_flag, printi_flag,  inum_val);
 
-        return 0;
+        exit();
 }
-
-
