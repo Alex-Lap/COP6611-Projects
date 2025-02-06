@@ -24,11 +24,16 @@ char *fmtname(char *path){
     memmove(buf, p, strlen(p));
     memset(buf+strlen(p), ' ', DIRSIZ-strlen(p));
     buf[DIRSIZ] = 0;
+
+    int len = strlen(buf);
+    while (len > 0 && buf[len - 1] == ' ') {
+        buf[--len] = '\0';
+    }
     return buf;
 }
   
 
-void find(char *path, const char *look, int type_flag, char type_val, int inum_flag, int printi_flag, int inum_val){
+void find(char *path, char *look, int type_flag, char type_val, int inum_flag, int printi_flag, int inum_val){
     struct stat targetinfo;
     struct dirent de;
     char buf[512], *p;
@@ -36,13 +41,13 @@ void find(char *path, const char *look, int type_flag, char type_val, int inum_f
 
     // open file descriptor
     if ((fd = open(path,0)) < 0){
-        //fprintf("path open fail\n");
+        printf(1, "path open fail\n");
         return;
     }
 
     // retrieve information about file using fd
     if (fstat(fd, &targetinfo)<0){
-        //fprintf(2,"error");
+        printf(2,"error\n");
         close(fd);
         return;
     }
@@ -51,28 +56,28 @@ void find(char *path, const char *look, int type_flag, char type_val, int inum_f
     {
     case T_DEVICE:
     case T_FILE:
-        if((type_flag && type_val== 'f') || (inum_flag && targetinfo.ino==inum_val)){
+        if((!type_flag || type_val== 'f') || (inum_flag && targetinfo.ino==inum_val)){
             char * name = fmtname(path);
             if(strcmp(look, name) == 0){
                 if(printi_flag){
-                    //printf("%d", targetinfo.ino);
+                    printf(1, "%d", targetinfo.ino);
                 }
-                //printf("%s", path);
+                printf(1, "%s\n", path);
             }
         }
         break;
     case T_DIR:
-        if(type_flag && type_val == 'd'){
+        if(!type_flag || type_val == 'd'){
             char * name = fmtname(path);
             if(strcmp(look, name) == 0){
                 if(printi_flag){
-                    //printf("%d", targetinfo.ino);
+                    printf(1, "%d", targetinfo.ino);
                 }
-                //printf("%s", path);
+                printf(1, "%s", path);
             }
         }
         if (strlen(path) + 1 + DIRSIZ + 1 > sizeof(buf) ){
-            //fprintf(2,"error");
+            printf(2,"error");
             break;
         }
 
@@ -90,7 +95,7 @@ void find(char *path, const char *look, int type_flag, char type_val, int inum_f
             memmove(p, de.name, DIRSIZ);
             p[DIRSIZ] = 0;
             if(stat(buf, &targetinfo) <0){
-                //printf("find: cannot stat %s\n", buf);
+                printf(1, "find: cannot stat %s\n", buf);
                 continue;
             }
             find(buf, look, type_flag, type_val, inum_flag, printi_flag, inum_val);
@@ -112,7 +117,7 @@ int main(int argc, char *argv[]){
     
     int i = 2; 
     char* path = argv[1]; //path provided
-    const char* look = 0; // what we are looking for(file/dir)
+    char* look = 0; // what we are looking for(file/dir)
     // flags if flag provided with input
     int type_flag = 0;
     char type_val = 0;
