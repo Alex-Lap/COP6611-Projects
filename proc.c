@@ -88,6 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->num_ticks = 0;
 
   release(&ptable.lock);
 
@@ -343,6 +344,8 @@ scheduler(void)
       switchuvm(p);
       p->state = RUNNING;
 
+      p->num_ticks++; //increment ticks for scheduled process
+
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
@@ -531,4 +534,24 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+
+
+
+int ticks_run(int pid){
+  struct proc *p; // assign pointer to proc struct
+  acquire(&ptable.lock); //acquire lock
+  //loop through process table and look to see if given pid is a match
+  //if found, return ticks scheduled for process and release lock
+  for(p = ptable.proc; p< &ptable.proc[NPROC]; p++) { 
+    if(p->pid == pid) {
+      int tick = p->num_ticks;
+      release(&ptable.lock);
+      return ticks;
+    }
+  }
+  //if not found release lock and return -1
+  release(&ptable.lock);
+  return -1;
 }
