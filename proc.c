@@ -88,6 +88,9 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->isthread = 0;      // Not a thread by default
+  p->stack = 0;         // No thread stack by default
+  p->thread_id = 0; 
 
   release(&ptable.lock);
 
@@ -252,19 +255,32 @@ exit(void)
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
 
-  // Pass abandoned children to init.
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
+  // If this is a thread, only clean up this thread
+  if(curproc->isthread) {
+    // Mark this thread as ZOMBIE so it can be cleaned up
+    curproc->state = ZOMBIE;
+    
+    // Wake up parent process or other threads that might be waiting
+    wakeup1(curproc->parent);
+    
+    // Jump into the scheduler
+    sched();
+    panic("thread zombie exit");
+  } else {
+    // Pass abandoned children to init.
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent == curproc){
+        p->parent = initproc;
+        if(p->state == ZOMBIE)
+          wakeup1(initproc);
+      }
     }
-  }
 
-  // Jump into the scheduler, never to return.
-  curproc->state = ZOMBIE;
-  sched();
-  panic("zombie exit");
+    // Jump into the scheduler, never to return.
+    curproc->state = ZOMBIE;
+    sched();
+    panic("zombie exit");
+  }
 }
 
 // Wait for a child process to exit and return its pid.
@@ -531,4 +547,84 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int
+clone(void(*fcn)(void*), void *arg, void *stack)
+{
+  int i, pid;
+  struct proc *np;
+  struct proc *curproc = myproc();
+  int thread_id = -1;
+  
+  // Find an available thread ID
+  for(i = 1; i < 8; i++) {
+    // Check if this thread ID is already in use by looking at process table
+    int in_use = 0;
+    struct proc *p;
+    
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      if(p->pgdir == curproc->pgdir && p->thread_id == i && p->state != UNUSED) {
+        in_use = 1;
+        break;
+      }
+    }
+    release(&ptable.lock);
+    
+    if(!in_use) {
+      thread_id = i;
+      break;
+    }
+  }
+  
+  if(thread_id == -1) {
+    // No available thread ID
+    return -1;
+  }
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  // Copy process state from proc.
+  np->pgdir = curproc->pgdir;  // Share page directory
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
+  
+  // Set thread attributes
+  np->isthread = 1;
+  np->stack = stack;
+  np->thread_id = thread_id;
+
+  // Set up new stack
+  uint sp = (uint)stack + PGSIZE;  // Stack grows downward
+  sp -= 8;  // Make space for the argument
+  *(uint*)sp = (uint)arg;  // Place argument on stack
+  sp -= 4;  // Make space for fake return PC
+  *(uint*)sp = 0xffffffff;  // Fake return PC
+
+  // Setup thread function call
+  np->tf->eip = (uint)fcn;  // Set instruction pointer to thread function
+  np->tf->esp = sp;         // Set stack pointer
+
+  // Clear %eax so that thread function returns 0
+  np->tf->eax = 0;
+
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  pid = np->pid;
+
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
+  release(&ptable.lock);
+
+  return pid;
 }

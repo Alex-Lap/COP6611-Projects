@@ -6,6 +6,8 @@
 #include "defs.h"
 #include "x86.h"
 #include "elf.h"
+#define MAX_THREADS 8
+#define THREAD_STACK_SIZE PGSIZE
 
 int
 exec(char *path, char **argv)
@@ -63,9 +65,12 @@ exec(char *path, char **argv)
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
   sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
+  if((sz = allocuvm(pgdir, sz, sz + (2 + 2*MAX_THREADS)*PGSIZE)) == 0)
     goto bad;
-  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
+
+// Set up guard page for main stack
+  clearpteu(pgdir, (char*)(sz - (2 + 2*MAX_THREADS)*PGSIZE));
+// Main thread stack is at the top
   sp = sz;
 
   // Push argument strings, prepare rest of stack in ustack.
@@ -112,3 +117,23 @@ exec(char *path, char **argv)
   }
   return -1;
 }
+
+uint
+setupuvm_thread(pde_t *pgdir, uint sz, int thread_id)
+{
+  if(thread_id < 0 || thread_id >= MAX_THREADS)
+    return 0;
+  
+  // Calculate where this thread's stack should be
+  // Main thread's stack is at the top of the address space
+  // Additional thread stacks are below, each with guard page
+  uint stack_top = sz - (2*thread_id)*PGSIZE;
+  uint guard_page = stack_top - 2*PGSIZE;
+  
+  // Set up guard page
+  clearpteu(pgdir, (char*)guard_page);
+  
+  return stack_top;
+}
+
+

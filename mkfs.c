@@ -41,6 +41,8 @@ void rsect(uint sec, void *buf);
 uint ialloc(ushort type);
 void iappend(uint inum, void *p, int n);
 
+
+
 // convert to intel byte order
 ushort
 xshort(ushort x)
